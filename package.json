@@ -47,9 +47,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/liujiang/dsh-title-wheel.git"
+    "url": "git+https://github.com/johnshere/dsh-title-wheel.git"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "homepage": "https://github.com/johnshere/dsh-title-wheel#readme",
+  "bugs": {
+    "url": "https://github.com/johnshere/dsh-title-wheel/issues"
   }
 }
