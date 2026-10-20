@@ -1,6 +1,6 @@
 {
   "name": "dsh-title-wheel",
-  "version": "0.1.0",
+  "version": "0.1.0-rc.1",
   "description": "标题轮盘：DSH 左侧会话列表标题双行显示 + 按时间轮盘生成的短编号前缀 + 可选模型生成标题（自定义提示词）。",
   "license": "MIT",
   "keywords": [
