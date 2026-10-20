@@ -1,0 +1,55 @@
+{
+  "name": "dsh-title-wheel",
+  "version": "0.1.0",
+  "description": "标题轮盘：DSH 左侧会话列表标题双行显示 + 按时间轮盘生成的短编号前缀 + 可选模型生成标题（自定义提示词）。",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "session-title",
+    "title",
+    "sidebar"
+  ],
+  "main": "src/index.js",
+  "type": "commonjs",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./client/bundle.js",
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22.5",
+    "dsh": ">=0.1.7-rc.2"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "files": [
+    "src",
+    "client",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build-client.mjs",
+    "check": "node --check src/index.js && node --check client/bundle.js",
+    "test": "node --test \"test/*.test.mjs\"",
+    "prepublishOnly": "npm run build && npm run check && npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liujiang/dsh-title-wheel.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

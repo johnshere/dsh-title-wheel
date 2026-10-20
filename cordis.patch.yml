@@ -1,0 +1,23 @@
+# 标题轮盘（title-wheel）bundle patch
+#
+# 本插件是 HOST-PLANE：注册 ctx.sessionTitle 的标题提供方（该注册表全局只允许
+# 一个提供方，见 @deepseek-ai/dsh-session-title README），并向客户端提供
+# 设置页 / 编号查询的 HTTP 端点。必须落在宿主组合里（insert），不进 agent preset。
+#
+# 关键：base 组合默认挂了 session-title-llm（first-prompt-llm），profile 还装了
+# session-title-all-prompts-llm。sessionTitle 服务只允许一个提供方，第二个
+# register 会立刻抛错、导致整棵插件树加载失败。这里用同 id 覆盖把两个官方实现
+# 都停掉（last write wins），槽位归我们，于是不再存在「谁先注册谁赢」的竞争。
+# 卸载本插件时本层随之移除，官方实现自动恢复。
+
+- insert:
+    - id: title-wheel
+      name: dsh-title-wheel
+
+# 内建 first-prompt-llm 提供方让位。
+- id: session-title-llm
+  disabled: true
+
+# 全对话总结型官方提供方让位（若 profile 未安装该行，覆盖无副作用）。
+- id: session-title-all-prompts-llm
+  disabled: true
