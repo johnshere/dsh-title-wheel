@@ -100,7 +100,7 @@ function codesCss(sessions) {
     .filter((item) => item && item.id && item.code)
     .map(
       (item) =>
-        `[data-row-key="session:${cssEscape(item.id)}"] [class*="_title"]::before{content:"${cssEscape(item.code)} · "}`
+        `[data-row-key="session:${cssEscape(item.id)}"] [class*="_title"]::before{content:"${cssEscape(item.code)}· "}`
     )
     .join('\n')
 }

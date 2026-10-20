@@ -49,6 +49,33 @@ const BACKFILL_SPACING_MS = 500
 // ── 小工具 ────────────────────────────────────────────────────────────────
 
 /**
+ * 安全取一个可选服务。
+ *
+ * cordis 的 `inject` 里写进去的依赖是**激活前置条件**（凑不齐插件就停在 pending，
+ * 一声不响地不加载），所以可选服务不能写进 inject，只能按需取。又因为 cordis 的
+ * 上下文是个 Proxy，直接 `ctx.sessions` 在没 inject 的情况下会抛
+ * `cannot get property "sessions" without inject`，必须走 `ctx.get(name)`
+ * ——它按文档就是"Read a service from the store without the inject requirement"，
+ * 没提供时返回 undefined。
+ *
+ * @param {object} ctx 插件上下文。
+ * @param {string} name 服务名。
+ * @returns {any} 服务实例或 undefined。
+ */
+function serviceOf(ctx, name) {
+  try {
+    if (ctx && typeof ctx.get === 'function') return ctx.get(name)
+  } catch {
+    // ctx.get 不存在或运行时未就绪：退回直接取属性
+  }
+  try {
+    return ctx ? ctx[name] : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * 深冻结。宿主会把消息对象当作不可变值（服务层可能 freeze 校验），
  * 这里保持一致，避免下游意外改写我们的输入。
  * @param {any} value 任意值。
@@ -150,8 +177,9 @@ function sessionMeta(session) {
 /** 取"活着的会话"（宿主未挂 sessions 服务时返回空数组）。 */
 function listLiveSessions(ctx) {
   try {
-    if (ctx.sessions && typeof ctx.sessions.list === 'function') {
-      const list = ctx.sessions.list()
+    const sessions = serviceOf(ctx, 'sessions')
+    if (sessions && typeof sessions.list === 'function') {
+      const list = sessions.list()
       if (Array.isArray(list)) return list
     }
   } catch {
@@ -173,7 +201,7 @@ function listLiveSessions(ctx) {
  * @returns {Promise<Array<{id:string, createdAt:number}>>} 会话元信息。
  */
 async function listSessionMeta(ctx) {
-  const query = ctx.sessionQuery
+  const query = serviceOf(ctx, 'sessionQuery')
   if (query && typeof query.listSessions === 'function') {
     try {
       const records = await query.listSessions()
@@ -236,7 +264,8 @@ function apply(ctx) {
 
   const logger = (() => {
     try {
-      return typeof ctx.logger === 'function' ? ctx.logger(PLUGIN_ID) : null
+      const factoryOf = serviceOf(ctx, 'logger')
+      return typeof factoryOf === 'function' ? factoryOf(PLUGIN_ID) : null
     } catch {
       return null
     }
@@ -518,8 +547,9 @@ function apply(ctx) {
 
   const handle = async (req, res) => {
     try {
-      if (ctx.connection && typeof ctx.connection.requestRejection === 'function') {
-        const rejection = ctx.connection.requestRejection(req)
+      const connection = serviceOf(ctx, 'connection')
+      if (connection && typeof connection.requestRejection === 'function') {
+        const rejection = connection.requestRejection(req)
         if (rejection !== undefined) {
           res.writeHead(rejection)
           res.end()
@@ -564,9 +594,10 @@ function apply(ctx) {
     }
   }
 
-  if (ctx.webServer && typeof ctx.webServer.register === 'function') {
+  const webServer = serviceOf(ctx, 'webServer')
+  if (webServer && typeof webServer.register === 'function') {
     ctx.effect(
-      () => ctx.webServer.register({ kind: 'prefix', path: API_PREFIX, handler: handle }),
+      () => webServer.register({ kind: 'prefix', path: API_PREFIX, handler: handle }),
       `${PLUGIN_ID}: http routes`
     )
   } else {
@@ -580,12 +611,11 @@ function apply(ctx) {
 
 module.exports = {
   name: PLUGIN_ID,
-  // sessionTitle 与 llm 是硬依赖：没有它们这个插件没有任何意义。
-  // 其余服务按可选处理，缺了只降级（编号表为空 / 设置页不挂载），
-  // 不能让整个 plugin tree 因为一个可选服务缺失就加载失败。
-  inject: {
-    required: ['sessionTitle', 'llm'],
-    optional: ['sessions', 'sessionQuery', 'webServer', 'connection']
-  },
+  // 必须用**数组形式**：宿主自带的 cordis 把 inject 数组元素当作服务名，
+  // 而对象形式会被当成「服务名 → 拦截配置」的映射（`Inject.resolve`），
+  // 写 `{required, optional}` 会变成等两个叫 required / optional 的服务，
+  // 插件永远停在 pending、一声不响地不加载。
+  // 所以可选服务不写进 inject，统一走 serviceOf() 的 ctx.get()。
+  inject: ['sessionTitle', 'llm'],
   apply
 }

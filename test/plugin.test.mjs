@@ -79,10 +79,11 @@ function createCtx(options = {}) {
   return { ctx, state }
 }
 
-test('插件导出：硬依赖只有 sessionTitle 与 llm', () => {
+test('插件导出：inject 必须是数组形式，且只有 sessionTitle 与 llm 两个硬依赖', () => {
   assert.equal(plugin.name, 'title-wheel')
-  assert.deepEqual(plugin.inject.required, ['sessionTitle', 'llm'])
-  assert.deepEqual(plugin.inject.optional, ['sessions', 'sessionQuery', 'webServer', 'connection'])
+  // 对象形式会被 cordis 当成「服务名 → 拦截配置」的映射，插件永远 pending，
+  // 所以这里必须钉死是数组。
+  assert.deepEqual(plugin.inject, ['sessionTitle', 'llm'])
   assert.equal(typeof plugin.apply, 'function')
 })
 
@@ -288,6 +289,56 @@ test('sessions 端点：优先用 sessionQuery 的全量语料，覆盖没打开
     code: code.sessionCode(item.createdAt, cfg)
   }))
   assert.deepEqual(response.payload.sessions, expected, '编号必须来自全量语料，而不是只覆盖活会话')
+})
+
+test('可选服务只经 ctx.get 取：属性一读就抛的上下文也能装配', async () => {
+  // 模拟真实 cordis 上下文：没写进 inject 的服务，属性访问直接抛
+  // `cannot get property "x" without inject`，只有 ctx.get(name) 能拿到。
+  const services = {
+    sessions: { list: () => [createSession('s1', new Date(2026, 9, 20, 17, 16, 11).getTime(), [])] },
+    webServer: {
+      register: (spec) => {
+        services.registered = spec
+        return () => {}
+      }
+    },
+    connection: { requestRejection: () => undefined }
+  }
+  const base = {
+    effect: (fn) => {
+      const dispose = fn()
+      return typeof dispose === 'function' ? dispose : () => {}
+    },
+    sessionTitle: { register: () => () => {}, get: () => undefined, refresh: async () => {} },
+    llm: { prepareCall: async () => ({ config: {}, stream: async function* () {} }) },
+    get: (name) => services[name]
+  }
+  const forbidden = ['sessions', 'sessionQuery', 'webServer', 'connection', 'logger']
+  const ctx = new Proxy(base, {
+    get(target, prop) {
+      if (forbidden.includes(prop)) throw new Error(`cannot get property "${prop}" without inject`)
+      return target[prop]
+    }
+  })
+
+  config.__resetCache()
+  config.writeConfig({ sessionCode: true })
+  assert.doesNotThrow(() => plugin.apply(ctx), '缺 inject 的可选服务不能让装配抛错')
+  assert.equal(services.registered.path, '/title-wheel/api')
+
+  const response = { status: 0, payload: null }
+  await services.registered.handler(
+    { method: 'GET', url: '/title-wheel/api/sessions', on: () => {}, destroy: () => {} },
+    {
+      writeHead: (status) => {
+        response.status = status
+      },
+      end: (text) => {
+        response.payload = JSON.parse(text)
+      }
+    }
+  )
+  assert.equal(response.payload.sessions.length, 1, '编号表仍能通过 ctx.get 拿到活会话')
 })
 
 test.after(() => {

@@ -3,7 +3,7 @@
 给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的会话侧栏加三样东西：
 
 1. **标题两行显示** —— 左侧会话列表的标题原本一行就省略号，现在放得下两行，超过两行才截断；
-2. **时间轮盘编号** —— 每条会话标题前面挂一个两位编号（如 `J7 · 需求 15474 优化`），按会话创建时间算出来，同一时刻恒定同号、全天不重号、相邻时间互相错开；
+2. **时间轮盘编号** —— 每条会话标题前面挂一个两位编号（如 `J7· 需求 15474 优化`），按会话创建时间算出来，同一时刻恒定同号、全天不重号、相邻时间互相错开；
 3. **可自定义的模型标题** —— 用模型把整段对话总结成一行标题，提示词末尾可以追加你自己的要求（例如"提取需求编号放在标题最前面"）。
 
 编号是**纯代码**算出来的，走 CSS `::before` 渲染，不写进标题数据 —— 所以模型每轮重写标题都不会把它冲掉。
@@ -100,8 +100,9 @@ perm  = (index × 461 + 977) mod 1296                   → 双射洗牌（461 �
 ## 实现要点
 
 - **双行标题**：覆盖宿主 `ui-workspace` 的 `.sessionRow { height:32px }` 与 `.title { white-space:nowrap; text-overflow:ellipsis }`，改用 `-webkit-line-clamp`。选择器写成 `[class*="_sessionRow"]`，因为宿主 CSS Modules 的类名带构建期哈希前缀（`hIlkoa_` 之类），随版本变化。
-- **编号前缀**：客户端把 `[data-row-key="session:<id>"] [class*="_title"]::before { content: "J7 · " }` 注入 document。宿主会话列表没有 shadow DOM，document 级样式表直接生效；`::before` 不参与 React diff，也不占标题文本。
+- **编号前缀**：客户端把 `[data-row-key="session:<id>"] [class*="_title"]::before { content: "J7· " }` 注入 document。宿主会话列表没有 shadow DOM，document 级样式表直接生效；`::before` 不参与 React diff，也不占标题文本。
 - **不 import 任何 `@deepseek-ai/*` 包**：本插件装在 profile 之外（`link:`），从插件目录往上解析不到宿主的 node_modules（宿主是 Electron，模块压在 `app.asar` 里）。消息对象、流式 chunk 归并都在本地实现，只依赖 `ctx.*` 服务。
+- **`inject` 只能写数组，可选服务走 `ctx.get()`**：宿主自带的 cordis 把 `inject` 数组元素当服务名，对象形式则被当成「服务名 → 拦截配置」的映射 —— 写 `{required, optional}` 会变成等两个叫 `required` / `optional` 的服务，插件永远停在 pending、一声不响地不加载。所以只有 `['sessionTitle','llm']` 进 inject，`sessions` / `sessionQuery` / `webServer` / `connection` 都用 `ctx.get(name)` 按需取（没 inject 时直接读属性会抛 `cannot get property … without inject`）。
 - **手动重算只覆盖活会话**：`ctx.sessionTitle.refresh(session)` 内部校验会话是否还在这个进程的 store 里（非活会话直接抛 `session "<id>" is not live in this store`），所以历史会话没法在这里补标题；它们靠 `automatic: 'all-prompts'` 在下次收到用户消息时自动重算。
 - **配置不用 schemastery**：改用 JSON 文件 + 插件自己的 HTTP 端点（`/title-wheel/api/*`），避免 schema 与宿主版本耦合。代价是不进宿主原生设置文档，所以我们自带设置页。
 
@@ -110,7 +111,7 @@ perm  = (index × 461 + 977) mod 1296                   → 双射洗牌（461 �
 ```powershell
 npm run build   # client/index.js → client/bundle.js（包进 window.__ModuleLoader__.load）
 npm run check   # 语法检查
-npm test        # 42 个单测：编号算法、转写裁剪、提示词清洗、provider 协议、HTTP 端点、客户端 CSS
+npm test        # 43 个单测：编号算法、转写裁剪、提示词清洗、provider 协议、HTTP 端点、客户端 CSS
 ```
 
 `client/bundle.js` 是构建产物，不要手改。

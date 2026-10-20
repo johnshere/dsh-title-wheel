@@ -108,11 +108,11 @@ test('编号样式：挂在会话行的标题伪元素上', () => {
   ])
   assert.equal(
     css,
-    '[data-row-key="session:s1"] [class*="_title"]::before{content:"J7 · "}\n' +
-      '[data-row-key="session:s2"] [class*="_title"]::before{content:"W0 · "}'
+    '[data-row-key="session:s1"] [class*="_title"]::before{content:"J7· "}\n' +
+      '[data-row-key="session:s2"] [class*="_title"]::before{content:"W0· "}'
   )
   assert.equal(bundle.__internals.codesCss([]), '')
-  // 缺字段的条目不能让整段 CSS 变成 `content:"undefined · "`
+  // 缺字段的条目不能让整段 CSS 变成 `content:"undefined· "`
   assert.equal(bundle.__internals.codesCss([{ id: 's3' }]), '')
 })
 
